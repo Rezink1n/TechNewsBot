@@ -1,26 +1,24 @@
 import logging
+import sqlite3
 
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor, markdown
 import asyncio
 
-from parser import *
-from users_database import *
-from news_database import *
-from config import TOKEN, admin, update_time, start_msg
+from parser import add_news
+from users_database import all_users_id, all_users_info, add_user
+from news_database import get_unread_news
+from config import TOKEN, admin
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-
-
 async def on_startup(_):
-    print('Bot is started')
     await bot.send_message(admin, '<< Bot started >>')
-    asyncio.create_task(always_update())
+    asyncio.create_task(always_update(900))
 
 
 @dp.message_handler(commands=['start'])
@@ -31,13 +29,11 @@ async def process_start_command(message: types.Message):
     try:
         add_user(id, name, username)
         await bot.send_message(admin, f"New user\nID: {id}\nName: {name}\n@{username}", disable_notification=True)
-        await bot.send_message(id, start_msg(name))
+        await bot.send_message(id, f"Привет {name}!\nВы успешно подписались на новости\nЖдите ближайшего обновления :)\n(каждые 15 минут)")
     except sqlite3.IntegrityError:
         await bot.send_message(id, 'Вы уже подписаны')
     except sqlite3.OperationalError:
         await bot.send_message(id, 'Не тыкай так часто :)')
-
-
 
 
 @dp.message_handler(commands=['id'])
@@ -67,13 +63,11 @@ async def users_stat(m: types.Message):
         await bot.send_message(admin, f'Users: {len(users)}')
 
 
-async def always_update():
+async def always_update(update_time):
     await asyncio.sleep(5)
     await bot.send_message(admin, ' > Auto-update turned on ')
     while True:
-        print('U', end='')
         await new_article()
-        print('s', end='')
         await asyncio.sleep(update_time)
 
 
@@ -94,17 +88,14 @@ async def new_article():
             users_id_list = all_users_id()
             for id in users_id_list:
                 if count % 20 == 0 and count != 0:
-                    print('Sleep a little bit :)')
                     await asyncio.sleep(2)
                 else:
                     pass
                 try:
-                    print(msg)
                     await bot.send_message(id, msg, parse_mode='markdown', disable_web_page_preview=True)
-
                     count += 1
                 except:
-                    print(f" ! Can't send to {id}")
+                    await bot.send_message(admin, f" ! Can't send to {id}")
             news_count += 1
         if news_count > 0:
             users_get_msg = count/news_count
@@ -112,13 +103,8 @@ async def new_article():
             users_get_msg = 0
         await bot.send_message(admin, f' > Sent {news_count} news\n{count} messages at all\nAbout {users_get_msg} users')
     else:
-        print('', end = '')
         await bot.send_message(admin, ' > Ничего нового')
 
 
-async def on_shutdown(_):
-    print('Bot is finished')
-
-
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=False, on_startup=on_startup, on_shutdown=on_shutdown)
+    executor.start_polling(dp, skip_updates=False, on_startup=on_startup)
