@@ -20,7 +20,7 @@ dp = Dispatcher(bot)
 async def on_startup(_):
     print('Bot is started')
     await bot.send_message(admin, '<< Bot started >>')
-    # asyncio.create_task(always_update())
+    asyncio.create_task(always_update())
 
 
 @dp.message_handler(commands=['start'])
